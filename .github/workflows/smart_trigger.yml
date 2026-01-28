@@ -1,4 +1,5 @@
 name: Smart QA Trigger
+
 on:
   push:
     branches: [ main ]
@@ -7,10 +8,12 @@ jobs:
   dispatch-logic:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: 🔍 Checkout Code
+        uses: actions/checkout@v4
       
-      # 1. Filtro de carpetas preciso
-      - uses: dorny/paths-filter@v3
+      # 1. Filtro para detectar qué carpetas cambiaron
+      - name: 📂 Check Changed Paths
+        uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -20,20 +23,13 @@ jobs:
             pw_js: ['pw_js/**']
 
       # 2. Envío al Orquestador
-      - name: Dispatch to Orchestrator
-        # Solo dispara si hubo cambios en alguna de las carpetas de interés
+      - name: 🚀 Dispatch to Orchestrator
+        # Solo dispara si el filtro detectó cambios en alguna carpeta
         if: steps.filter.outputs.changes != '[]'
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.ORCHESTRATOR_TOKEN }}
           repository: Luigi920103/qa-orchestrator
           event-type: trigger-automation
-          # Aquí armamos el JSON dinámico
-          client_payload: |
-            {
-              "pw_ts_bdd_changed": "${{ steps.filter.outputs.pw_ts_bdd }}",
-              "pw_ts_changed": "${{ steps.filter.outputs.pw_ts }}",
-              "pw_js_bdd_changed": "${{ steps.filter.outputs.pw_js_bdd }}",
-              "pw_js_changed": "${{ steps.filter.outputs.pw_js }}",
-              "env": "dev"
-            }
+          # Usamos un formato de JSON robusto en una sola línea
+          client_payload: '{"pw_ts_bdd_changed": "${{ steps.filter.outputs.pw_ts_bdd }}", "pw_ts_changed": "${{ steps.filter.outputs.pw_ts }}", "pw_js_bdd_changed": "${{ steps.filter.outputs.pw_js_bdd }}", "pw_js_changed": "${{ steps.filter.outputs.pw_js }}", "env": "dev"}'
