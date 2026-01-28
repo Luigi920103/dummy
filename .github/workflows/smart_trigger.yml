@@ -4,30 +4,36 @@ on:
     branches: [ main ]
 
 jobs:
-  check-changes-and-dispatch:
+  dispatch-logic:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      
+      # 1. Filtro de carpetas preciso
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          fetch-depth: 2 # Necesario para comparar el commit actual con el anterior
+          filters: |
+            pw_ts_bdd: ['pw_ts_bdd/**']
+            pw_ts: ['pw_ts/**']
+            pw_js_bdd: ['pw_js_bdd/**']
+            pw_js: ['pw_js/**']
 
-      - name: Detect Changes and Dispatch
+      # 2. Envío al Orquestador
+      - name: Dispatch to Orchestrator
+        # Solo dispara si hubo cambios en alguna de las carpetas de interés
+        if: steps.filter.outputs.changes != '[]'
         uses: peter-evans/repository-dispatch@v2
         with:
           token: ${{ secrets.ORCHESTRATOR_TOKEN }}
           repository: Luigi920103/qa-orchestrator
           event-type: trigger-automation
-          # Aquí usamos condicionales de shell para armar el JSON
-          client_payload: >
+          # Aquí armamos el JSON dinámico
+          client_payload: |
             {
-              "service": "${{ 
-                contains(github.event.head_commit.modified, 'pw_ts_bdd/') && 'pw_ts_bdd' || 
-                contains(github.event.head_commit.modified, 'pw_ts/') && 'pw_ts' ||
-                contains(github.event.head_commit.modified, 'pw_js_bdd/') && 'pw_js_bdd' ||
-                contains(github.event.head_commit.modified, 'pw_js/') && 'pw_js' ||
-                'all' 
-              }}",
-              "env": "staging",
-              "commit_sha": "${{ github.sha }}"
+              "pw_ts_bdd_changed": "${{ steps.filter.outputs.pw_ts_bdd }}",
+              "pw_ts_changed": "${{ steps.filter.outputs.pw_ts }}",
+              "pw_js_bdd_changed": "${{ steps.filter.outputs.pw_js_bdd }}",
+              "pw_js_changed": "${{ steps.filter.outputs.pw_js }}",
+              "env": "dev"
             }
